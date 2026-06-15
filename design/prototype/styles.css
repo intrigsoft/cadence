@@ -1,0 +1,123 @@
+/* Cadence — design tokens + base. "Studio Kanban": warm paper host app,
+   dark ink embedded assistant. */
+
+:root {
+  /* warm paper canvas */
+  --canvas: #F4F1EA;
+  --surface: #FFFFFF;
+  --surface-2: #ECEAE2;     /* list columns */
+  --surface-3: #E4E1D7;     /* hover wells */
+  --paper-edge: #E2DED3;
+
+  /* ink */
+  --ink: #1A1814;
+  --ink-2: #56524B;
+  --ink-3: #8C887F;
+  --line: #E3DFD5;
+  --line-2: #D6D1C4;
+
+  /* brand */
+  --brand: #4B3FE4;
+  --brand-700: #3A2FC0;
+  --brand-100: #E7E4FB;
+  --brand-tint: #EFEDFB;
+
+  /* dark chrome (sidebar + assistant) */
+  --ink-900: #1A1814;
+  --ink-850: #211E19;
+  --ink-800: #2A2620;
+  --ink-700: #383229;
+  --ink-on-dark: #F4F1EA;
+  --ink-on-dark-2: #B7B0A1;
+  --ink-on-dark-3: #847D6E;
+  --line-dark: #393227;
+
+  /* assistant accent (a touch brighter on dark) */
+  --beam: #8C7DFF;
+  --beam-soft: #6B5CF0;
+
+  --shadow-card: 0 1px 0 rgba(26,24,20,.04), 0 1px 3px rgba(26,24,20,.07);
+  --shadow-pop: 0 12px 40px -8px rgba(26,24,20,.28), 0 2px 8px rgba(26,24,20,.12);
+  --shadow-drag: 0 18px 44px -8px rgba(26,24,20,.40);
+
+  --r-sm: 7px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+
+  --font-display: 'Bricolage Grotesque', Georgia, serif;
+  --font-ui: 'Hanken Grotesk', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --sidebar-w: 248px;
+  --topbar-h: 58px;
+  --assistant-w: 392px;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font-family: var(--font-ui);
+  background: var(--canvas);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+#root { height: 100vh; }
+
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+input, textarea { font-family: inherit; }
+::selection { background: var(--brand-100); }
+
+/* paper grain on the canvas */
+.grain::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  opacity: .5; mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+}
+
+/* scrollbars */
+::-webkit-scrollbar { height: 10px; width: 10px; }
+::-webkit-scrollbar-thumb { background: rgba(26,24,20,.16); border-radius: 99px; border: 3px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: rgba(26,24,20,.28); background-clip: content-box; }
+.on-dark ::-webkit-scrollbar-thumb { background: rgba(244,241,234,.16); background-clip: content-box; }
+
+/* avatar */
+.avatar {
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%; color: #fff; font-weight: 700; flex: none;
+  font-family: var(--font-ui); letter-spacing: .01em;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.avatar.ring-dark { box-shadow: 0 0 0 2px var(--ink-850); }
+
+/* label chip */
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px;
+  border-radius: 6px; font-size: 11.5px; font-weight: 700; letter-spacing: .02em;
+  white-space: nowrap;
+}
+
+/* focus ring */
+.focusable:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* generic button */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px;
+  border-radius: var(--r-md); font-weight: 600; font-size: 13.5px; transition: .14s;
+}
+.btn-primary { background: var(--brand); color: #fff; }
+.btn-primary:hover { background: var(--brand-700); }
+.btn-ghost { color: var(--ink-2); }
+.btn-ghost:hover { background: rgba(26,24,20,.06); color: var(--ink); }
+.btn-outline { border: 1px solid var(--line-2); color: var(--ink); background: var(--surface); }
+.btn-outline:hover { border-color: var(--ink-3); }
+
+/* entrance */
+@keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes panelIn { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes scaleIn { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes toastIn { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes beamPulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
