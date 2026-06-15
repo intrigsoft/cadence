@@ -119,6 +119,16 @@ export function cardsForBoard(state: WorkspaceState, actor: Actor | null, boardI
     .sort((a, b) => (order.get(a.listId)! - order.get(b.listId)!) || a.pos - b.pos);
 }
 
+/** A single card with the membership gate applied (NotFound if hidden). */
+export function getCard(state: WorkspaceState, actor: Actor | null, cardId: string): Card {
+  const user = requireUser(state, actor);
+  const card = state.cards.find((c) => c.id === cardId);
+  if (!card) throw new NotFoundError();
+  getBoard(state, actor, card.boardId); // membership gate (NotFound if hidden)
+  void user;
+  return card;
+}
+
 /** Scoped card search — only boards the actor can access (design/API_CONTRACT GET /search/cards). */
 export function searchCards(state: WorkspaceState, actor: Actor | null, q: string): Card[] {
   const user = requireUser(state, actor);
@@ -176,10 +186,12 @@ export function moveCard(
 
   // Workflow stage×role gate. A same-list reorder only needs `drop` on the list.
   if (fromListId !== toListId) {
-    if (!canStage(board, user, fromListId, 'pick')) throw new ForbiddenError('No permission to move cards out of this stage');
-    if (!canStage(board, user, toListId, 'drop')) throw new ForbiddenError('No permission to move cards into this stage');
+    if (!canStage(board, user, fromListId, 'pick'))
+      throw new ForbiddenError(`Your role can't move cards out of ${listName(board, fromListId)} on this board`, 'WORKFLOW_PICK_DENIED');
+    if (!canStage(board, user, toListId, 'drop'))
+      throw new ForbiddenError(`Your role can't move cards into ${listName(board, toListId)} on this board`, 'WORKFLOW_DROP_DENIED');
   } else if (!canStage(board, user, toListId, 'drop')) {
-    throw new ForbiddenError('No permission to reorder in this stage');
+    throw new ForbiddenError(`Your role can't reorder cards in ${listName(board, toListId)} on this board`, 'WORKFLOW_REORDER_DENIED');
   }
 
   // Re-pack: pull the card out, splice into the target list at toIndex.
@@ -469,7 +481,7 @@ export function logTime(
   if (!Number.isFinite(minutes) || minutes <= 0) throw new ValidationError('Minutes must be a positive number');
 
   const listId = input.listId ?? card.listId;
-  if (!canTrack(board, user, listId)) throw new ForbiddenError('Your role cannot track time on this stage');
+  if (!canTrack(board, user, listId)) throw new ForbiddenError('Your role cannot track time on this stage', 'TRACK_DENIED');
   const roleId = board.roleAssignments[user.id] ?? Object.keys(board.roles)[0];
 
   const entry: TimeEntry = {
@@ -534,7 +546,7 @@ export function runningTimer(state: WorkspaceState, actor: Actor | null): Runnin
 /** Start a timer on a card (auto-stops + logs any other running timer first). */
 export function startTimer(state: WorkspaceState, actor: Actor | null, cardId: string): void {
   const { user, card, board } = cardCtx(state, actor, cardId);
-  if (!canTrack(board, user, card.listId)) throw new ForbiddenError('Your role cannot track time on this stage');
+  if (!canTrack(board, user, card.listId)) throw new ForbiddenError('Your role cannot track time on this stage', 'TRACK_DENIED');
   const existing = state.timers[user.id];
   if (existing && existing.cardId !== cardId) commitTimer(state, user.id);
   state.timers[user.id] = { cardId, startedAt: Date.now() };
@@ -583,7 +595,7 @@ export function saveWorkflow(
   const user = requireUser(state, actor);
   const board = state.boards[boardId];
   if (!board || !board.memberIds.includes(user.id)) throw new NotFoundError();
-  if (user.role !== 'admin') throw new ForbiddenError('Only workspace admins can edit the workflow');
+  if (user.role !== 'admin') throw new ForbiddenError('Only workspace admins can edit the workflow', 'ADMIN_REQUIRED');
   if (payload.lists) board.lists = payload.lists;
   if (payload.roles) board.roles = payload.roles;
   if (payload.roleAssignments) board.roleAssignments = payload.roleAssignments;

@@ -5,7 +5,7 @@ A Trello-style task-management app — the **DioscHub** sample. It's a believabl
 This repo is built in two parts:
 
 1. **The standalone app** (this phase) — the full product, with **server-enforced permissions** and a real **audit trail**, running entirely on its own. No external services required.
-2. **The DioscHub integration** (later) — the embedded assistant kit + an MCP relay acting as the user. The seam is already in place (`locals.actor`); the integration is additive.
+2. **The DioscHub integration** (later) — the embedded assistant kit + an MCP relay acting as the user. The seam is already in place (`locals.actor`); the integration is additive. The blueprint lives in [`design/PHASE-2-ASSISTANT-INTEGRATION.md`](./design/PHASE-2-ASSISTANT-INTEGRATION.md).
 
 The design brief, prototype, screenshots, and API contract live in [`design/`](./design).
 

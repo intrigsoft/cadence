@@ -55,6 +55,18 @@ export function getOrCreateDevice(cookieId: string | undefined): DeviceResolutio
   return { deviceId, state, isNew: true };
 }
 
+/**
+ * Look up an existing device's sandbox WITHOUT minting (touches lastSeen).
+ * The phase-2 machine API resolves the artifact's device this way — a bearer
+ * artifact must reference a live sandbox, never conjure a fresh one.
+ */
+export function getDevice(deviceId: string): WorkspaceState | null {
+  const state = DEVICES.get(deviceId);
+  if (!state) return null;
+  state.lastSeen = now();
+  return state;
+}
+
 /** Reset a device's sandbox back to the seed (the "Reset sandbox" affordance). */
 export function resetDevice(deviceId: string): WorkspaceState {
   const state = freshState();

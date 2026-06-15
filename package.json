@@ -11,6 +11,8 @@
     "preview": "vite preview",
     "start": "node build",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "check:mcp": "tsc -p tsconfig.mcp.json",
+    "mcp": "tsx mcp/main.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -26,6 +28,9 @@
     "vitest": "^2.1.0"
   },
   "dependencies": {
-    "svelte-dnd-action": "^0.9.70"
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "svelte-dnd-action": "^0.9.70",
+    "tsx": "^4.22.4",
+    "zod": "^4.4.3"
   }
 }
