@@ -13,6 +13,7 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:mcp": "tsc -p tsconfig.mcp.json",
     "mcp": "tsx mcp/main.ts",
+    "mcp:http": "tsx mcp/http.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

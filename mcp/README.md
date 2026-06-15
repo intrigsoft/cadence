@@ -21,7 +21,10 @@ ART=$(curl -s -XPOST http://localhost:5173/api/v1/dev/artifact \
   -H 'content-type: application/json' -d '{"userId":"u_sarah"}' \
   | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['artifact'])")
 
-# 2. Run the relay
+# 2a. Run the HTTP transport (what DioscHub connects to)
+CADENCE_API_URL=http://localhost:5173 npm run mcp:http        # http://localhost:5174/mcp
+
+# 2b. ...or the stdio transport for local CLI testing (single fixed identity)
 CADENCE_API_URL=http://localhost:5173 CADENCE_ARTIFACT="$ART" npm run mcp
 ```
 
@@ -30,7 +33,8 @@ CADENCE_API_URL=http://localhost:5173 CADENCE_ARTIFACT="$ART" npm run mcp
 | Var | Where | Purpose |
 | --- | --- | --- |
 | `CADENCE_API_URL` | relay | Base URL of the running Cadence app (default `http://localhost:5173`). |
-| `CADENCE_ARTIFACT` | relay | The BYOA artifact (bearer). In production DioscHub supplies this per session. |
+| `CADENCE_MCP_PORT` | relay (http) | Port for the HTTP transport (default `5174`). |
+| `CADENCE_ARTIFACT` | relay (stdio only) | Fixed BYOA artifact for the stdio transport. With the HTTP transport DioscHub supplies it per call via `_meta`, so this is unused. |
 | `CADENCE_ARTIFACT_SECRET` | **app** | HMAC secret used to sign/verify artifacts. Set the SAME value on the app process that mints and the one that verifies (one process in this sample). |
 | `CADENCE_DEV_ARTIFACT` | **app** | `1` enables the dev-only headless mint route. Never set in production. |
 
@@ -49,20 +53,36 @@ shared database).
 
 ## Registering with DioscHub
 
-Point a DioscHub MCP instance at this server as a stdio command, e.g.:
+DioscHub connects to external MCP servers over **HTTP/SSE (not stdio)**, and it
+delivers per-user identity inside each tool call's `_meta`, **not** as transport
+headers. So:
+
+1. Run the **HTTP** transport: `npm run mcp:http` (default `http://localhost:5174/mcp`).
+2. Register an MCP instance pointing at it:
 
 ```jsonc
+POST /api/admin/mcp-instances        // or, in dev, POST /api/test/mcp-instance
 {
-  "command": "npx",
-  "args": ["tsx", "mcp/main.ts"],
-  "cwd": "/path/to/cadence",
-  "env": { "CADENCE_API_URL": "https://cadence.example", "CADENCE_ARTIFACT": "<per-session artifact>" }
+  "name": "cadence",
+  "serverUrl": "http://localhost:5174/mcp",
+  "transportType": "http",
+  "isActive": true
 }
 ```
+
+The hub injects the session's bound BYOA auth into every call as
+`_meta.headers.Authorization`; this server reads it per call (`mcp/api.ts`,
+`artifactFor`) and forwards it to the Cadence API. No per-user token goes in the
+instance's static `authConfig` — that's only for an optional service-to-service
+secret.
 
 Which of the 28 tools actually **load** for a given session is DioscHub's
 toolset/role configuration — this server always exposes the broad surface and
 relies on Cadence's per-call enforcement (design doc §3, §5).
+
+> **stdio (`npm run mcp`)** is kept for local CLI testing only; the hub cannot
+> consume it. The stdio path uses the `CADENCE_ARTIFACT` env var as a single
+> fixed identity.
 
 ## Tools (28)
 

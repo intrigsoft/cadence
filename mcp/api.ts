@@ -1,14 +1,16 @@
 // HTTP client from the MCP relay to Cadence's machine API.
 //
-// The relay holds the BYOA artifact (CADENCE_ARTIFACT) and presents it as a
-// bearer on every call. It NEVER sends "who I am" as a parameter — identity is
-// the artifact. Cadence resolves the actor and enforces per-call; the relay just
-// forwards the structured result to the model.
+// The relay NEVER sends "who I am" as a parameter — identity is the BYOA
+// artifact. With DioscHub the artifact arrives PER CALL inside the MCP request
+// `_meta.headers.Authorization` (the hub injects the session's bound auth on
+// every tool call). For local stdio testing it falls back to the CADENCE_ARTIFACT
+// env var. Either way the relay just forwards it as a bearer and hands the
+// structured result back to the model.
 
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 const BASE = (process.env.CADENCE_API_URL ?? 'http://localhost:5173').replace(/\/$/, '');
-const ARTIFACT = process.env.CADENCE_ARTIFACT ?? '';
+const ENV_ARTIFACT = process.env.CADENCE_ARTIFACT ?? '';
 
 export interface ApiResult {
   ok: boolean;
@@ -21,8 +23,21 @@ export interface ApiResult {
 
 type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE' | 'PUT';
 
-export async function call(method: Method, path: string, payload?: unknown): Promise<ApiResult> {
-  const headers: Record<string, string> = { authorization: `Bearer ${ARTIFACT}` };
+/** The per-call request context the SDK hands a tool callback. */
+export interface ToolExtra {
+  _meta?: { headers?: Record<string, string>; [k: string]: unknown };
+}
+
+/** Pull the BYOA artifact for this call: per-call _meta header first, env fallback. */
+export function artifactFor(extra?: ToolExtra): string {
+  const headers = extra?._meta?.headers ?? {};
+  const auth = headers.Authorization ?? headers.authorization;
+  if (typeof auth === 'string' && auth.startsWith('Bearer ')) return auth.slice(7).trim();
+  return ENV_ARTIFACT;
+}
+
+export async function call(method: Method, path: string, payload: unknown, artifact: string): Promise<ApiResult> {
+  const headers: Record<string, string> = { authorization: `Bearer ${artifact}` };
   if (payload !== undefined) headers['content-type'] = 'application/json';
 
   let res: Response;
@@ -33,7 +48,6 @@ export async function call(method: Method, path: string, payload?: unknown): Pro
       body: payload !== undefined ? JSON.stringify(payload) : undefined
     });
   } catch (err) {
-    // Transport failure is distinct from a domain denial — say so plainly.
     return { ok: false, code: 'UNREACHABLE', message: `Cadence API unreachable: ${(err as Error).message}`, retryable: true, status: 0 };
   }
 
@@ -47,8 +61,8 @@ export async function call(method: Method, path: string, payload?: unknown): Pro
 }
 
 /**
- * Convert a machine-API result into an MCP tool result. Success returns the
- * data as JSON text; failure returns the structured contract ({code, message,
+ * Convert a machine-API result into an MCP tool result. Success returns the data
+ * as JSON text; failure returns the structured contract ({code, message,
  * retryable}) AND sets isError, so the model sees *why* it failed and can decide
  * to explain, retry, or report a partial outcome.
  */
@@ -62,9 +76,9 @@ export function toToolResult(api: ApiResult): CallToolResult {
   };
 }
 
-/** Convenience: call + map in one step. */
-export async function relay(method: Method, path: string, payload?: unknown): Promise<CallToolResult> {
-  return toToolResult(await call(method, path, payload));
+/** Resolve the artifact for this call, hit the API, and map to a tool result. */
+export async function relay(extra: ToolExtra | undefined, method: Method, path: string, payload?: unknown): Promise<CallToolResult> {
+  return toToolResult(await call(method, path, payload, artifactFor(extra)));
 }
 
 export function enc(segment: string): string {

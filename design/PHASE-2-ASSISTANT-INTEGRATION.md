@@ -202,20 +202,29 @@ A short, load-bearing block in the assistant's system prompt:
 | BYOA artifact (mint / verify, HMAC) | **built + tested** | `src/lib/server/api/artifact.ts`, `POST /api/v1/auth/artifact` |
 | `hooks` artifact → `actor{isAgent:true}` branch | **built** | `src/hooks.server.ts` |
 | Three-outcome error contract + codes | **built + tested** | `src/lib/server/api/respond.ts`, `src/lib/server/errors.ts` |
-| MCP server (28 tools, relay) | **built + tested** | `mcp/` (run: `npm run mcp` — see `mcp/README.md`) |
+| MCP server (28 tools, relay) | **built + tested** | `mcp/` — **HTTP** (`npm run mcp:http`, the hub transport) + stdio (`npm run mcp`, local). See `mcp/README.md` |
 | Dev headless artifact mint | **built** (double-gated) | `POST /api/v1/dev/artifact` |
-| Verification | 34 unit tests + live HTTP smoke + real stdio MCP round-trip | `npm test`, `npm run check:mcp` |
+| **Registered + discovered by a running DioscHub** | **done** | hub pulled all 28 tools (`initialize`/`tools/list`) from `http://localhost:5174/mcp` |
+| Verification | 34 unit tests + live HTTP smoke + real streamable-HTTP round-trip with per-call `_meta` BYOA | `npm test`, `npm run check:mcp` |
 
-**The wall — the live kit embedding** is not built (needs a running DioscHub, an
-embed key, and LLM credentials). What remains:
-1. Drop the DioscHub assistant-kit script into the app shell (the panel stub is
-   `src/lib/AssistantPanel.svelte`); wire the embed key.
-2. Have the host backend call `POST /api/v1/auth/artifact` for the signed-in
-   session and pass the artifact into the kit/DioscHub binding.
-3. Register this MCP server with a DioscHub MCP instance (`mcp/README.md`) and
-   configure the toolset/role tiers (§3) + approval policy for `delete_card`,
-   member management, and `save_workflow`.
-4. Set the assistant system prompt from §8.
+> **Transport correction (verified against the running hub):** DioscHub connects
+> to external MCP servers over **HTTP/SSE, not stdio**, and delivers per-user
+> identity inside each call's **`_meta.headers.Authorization`**, not as transport
+> headers. The server reads it per call (`mcp/api.ts` `artifactFor`). Register
+> with `transportType: "http"`, `serverUrl: http://<host>:5174/mcp`.
+
+**The wall — a live assistant acting in the app** is not built (needs an
+assistant configured with an LLM, an embed key, and the kit embedded). What
+remains:
+1. In the hub: create/choose an assistant whose role/toolset includes the
+   `cadence` instance's tools (§3 tiers), set an LLM, and configure approval for
+   `delete_card`, member management, and `save_workflow`. Set the §8 system prompt.
+2. Embed the DioscHub assistant-kit script in the app shell (panel stub:
+   `src/lib/AssistantPanel.svelte`) with the embed key.
+3. Stand up a Cadence `bind` endpoint: on `widget:auth:required`, mint via
+   `POST /api/v1/auth/artifact` (cookie-authed) and forward
+   `{ wsId, identity, authArtifacts: { headers: { Authorization } } }` to the
+   hub's `/auth/bind`. That puts the artifact into each call's `_meta`.
 
 ---
 

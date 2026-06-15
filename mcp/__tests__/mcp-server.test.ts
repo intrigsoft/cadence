@@ -63,6 +63,12 @@ describe('Cadence MCP server', () => {
     expect(calls[0].auth).toMatch(/^Bearer/);
   });
 
+  it('uses the per-call BYOA artifact from _meta.headers (DioscHub path)', async () => {
+    const client = await connect();
+    await client.callTool({ name: 'whoami', arguments: {}, _meta: { headers: { Authorization: 'Bearer SESSION-TOKEN' } } });
+    expect(calls[0].auth).toBe('Bearer SESSION-TOKEN');
+  });
+
   it('maps a denial to an MCP error result carrying the code', async () => {
     const client = await connect();
     const res = await client.callTool({ name: 'move_card', arguments: { cardId: 'c1', toListId: 'l2', toIndex: 0 } });
