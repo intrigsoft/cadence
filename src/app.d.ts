@@ -9,6 +9,8 @@ declare global {
       deviceId: string;
       /** This device's isolated in-memory workspace (the "DB" stand-in). */
       state: WorkspaceState;
+      /** Whether this device has signed in (false → show the login screen). */
+      authed: boolean;
       /** The signed-in human for this device's sandbox, or null. */
       user: User | null;
       /**

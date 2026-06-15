@@ -527,9 +527,22 @@ export function switchIdentity(state: WorkspaceState, userId: string): User {
   return user;
 }
 
-/** Sign out of the device's sandbox. */
+/** Sign in to the device sandbox as a seeded user (login screen / SSO stand-in). */
+export function signIn(state: WorkspaceState, userId: string): User {
+  const user = switchIdentity(state, userId);
+  state.authed = true;
+  return user;
+}
+
+/** Resolve a seeded user by email (the email sign-in path). */
+export function findUserByEmail(state: WorkspaceState, email: string): User | null {
+  const e = email.trim().toLowerCase();
+  return Object.values(state.users).find((u) => u.email.toLowerCase() === e) ?? null;
+}
+
+/** Sign out of the device's sandbox (returns to the login screen). */
 export function signOut(state: WorkspaceState): void {
-  state.currentUserId = null;
+  state.authed = false;
 }
 
 /** The seeded users offered by the sandbox identity picker, in demo order. */

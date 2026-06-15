@@ -315,8 +315,10 @@ export function buildSeed(): WorkspaceState {
     labels,
     boards,
     cards,
-    // Sandbox auto-signs-in as Sarah until the login screen lands (phase 2).
+    // Default identity highlight for the picker; the app stays gated by `authed`
+    // (the login screen is the product-true entry point).
     currentUserId: 'u_sarah',
+    authed: false,
     today: TODAY_ISO,
     personaOrder: ['u_sarah', 'u_marcus', 'u_priya', 'u_dana', 'u_tom'],
     createdAt: 0,

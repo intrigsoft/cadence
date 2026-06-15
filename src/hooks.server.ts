@@ -27,8 +27,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 
   event.locals.deviceId = deviceId;
   event.locals.state = state;
+  event.locals.authed = state.authed;
 
-  const user = state.currentUserId ? state.users[state.currentUserId] ?? null : null;
+  const user = state.authed && state.currentUserId ? state.users[state.currentUserId] ?? null : null;
   event.locals.user = user;
   event.locals.actor = user ? { userId: user.id, isAgent: false } : null;
 

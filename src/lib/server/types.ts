@@ -137,6 +137,8 @@ export interface WorkspaceState {
   cards: Card[];
   /** Who this device is currently signed in as (sandbox identity). */
   currentUserId: string | null;
+  /** Whether the device has signed in (gates the app vs the login screen). */
+  authed: boolean;
   /** ISO anchor for "today" so seeded relative due-dates stay stable. */
   today: string;
   /** Demo order for the identity picker / persona switcher. */
