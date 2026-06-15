@@ -2,6 +2,7 @@
   import Icon from '$lib/Icon.svelte';
   import AvatarStack from '$lib/AvatarStack.svelte';
   import DueChip from '$lib/DueChip.svelte';
+  import TimeChip from '$lib/TimeChip.svelte';
   import { dueMeta, shadeText } from '$lib/ui';
   import type { Card, Label, User } from '$lib/server/types';
 
@@ -22,8 +23,9 @@
   const due = $derived(dueMeta(card.due));
   const done = $derived(card.checklist.filter((k) => k.done).length);
   const hasAgent = $derived(card.activity.some((a) => a.kind === 'agent'));
+  const tracked = $derived(card.timeEntries.reduce((s, e) => s + e.minutes, 0));
   const hasMeta = $derived(
-    !!due || card.checklist.length > 0 || card.comments.length > 0 || hasAgent || members.length > 0
+    !!due || card.checklist.length > 0 || card.comments.length > 0 || hasAgent || members.length > 0 || tracked > 0
   );
 </script>
 
@@ -50,6 +52,7 @@
   {#if hasMeta}
     <div class="meta">
       {#if due}<DueChip {due} />{/if}
+      {#if tracked > 0}<TimeChip mins={tracked} />{/if}
       {#if card.checklist.length > 0}
         <span class="m" class:done={done === card.checklist.length}>
           <Icon name="checkSquare" size={14} /> {done}/{card.checklist.length}

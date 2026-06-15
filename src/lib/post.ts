@@ -1,6 +1,7 @@
 import { invalidateAll } from '$app/navigation';
 import { deserialize } from '$app/forms';
 import type { ActionResult } from '@sveltejs/kit';
+import { toast } from '$lib/stores';
 
 /**
  * Post to a SvelteKit form action by name, then re-sync from the server (the
@@ -21,6 +22,10 @@ export async function postAction(
     body
   });
   const result = deserialize(await res.text()) as ActionResult;
+  if (result.type === 'failure') {
+    const msg = (result.data?.error as string) ?? 'That action was not allowed.';
+    toast(msg, 'deny');
+  }
   if (result.type === 'success' || result.type === 'failure') await invalidateAll();
   return result;
 }

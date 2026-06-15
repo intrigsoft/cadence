@@ -139,6 +139,8 @@ export interface WorkspaceState {
   currentUserId: string | null;
   /** Whether the device has signed in (gates the app vs the login screen). */
   authed: boolean;
+  /** Running time-tracking timers, keyed by userId. */
+  timers: Record<string, { cardId: string; startedAt: number }>;
   /** ISO anchor for "today" so seeded relative due-dates stay stable. */
   today: string;
   /** Demo order for the identity picker / persona switcher. */

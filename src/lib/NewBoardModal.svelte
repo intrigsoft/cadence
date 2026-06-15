@@ -43,10 +43,11 @@
         }}>
       <h2>Create a board</h2>
 
-      <label>Board name</label>
-      <input name="name" bind:value={name} placeholder="e.g. Q4 Planning" autofocus />
+      <label for="board-name">Board name</label>
+      <!-- svelte-ignore a11y_autofocus -->
+      <input id="board-name" name="name" bind:value={name} placeholder="e.g. Q4 Planning" autofocus />
 
-      <label>Color</label>
+      <div class="field-label">Color</div>
       <input type="hidden" name="accent" value={accent} />
       <div class="swatches">
         {#each ACCENTS as c (c)}
@@ -61,7 +62,7 @@
         {/each}
       </div>
 
-      <label>Visibility</label>
+      <div class="field-label">Visibility</div>
       <input type="hidden" name="visibility" value={visibility} />
       <div class="vis">
         <button type="button" class="vis-opt" class:sel={visibility === 'private'} onclick={() => (visibility = 'private')}>
@@ -99,7 +100,7 @@
     border-radius: 7px; background: rgba(26, 24, 20, 0.28); backdrop-filter: blur(4px); color: #fff; font-size: 10.5px; font-weight: 700; }
   .body { padding: 20px 22px 22px; }
   h2 { font-family: var(--font-display); font-size: 21px; font-weight: 600; margin: 0; color: var(--ink); letter-spacing: -0.01em; }
-  label { display: block; font-size: 11.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-3); margin: 18px 0 7px; }
+  label, .field-label { display: block; font-size: 11.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-3); margin: 18px 0 7px; }
   input[name='name'] { width: 100%; height: 42px; padding: 0 13px; border-radius: 10px; border: 1px solid var(--line-2);
     font-size: 14px; color: var(--ink); outline: none; background: var(--canvas); }
   input[name='name']:focus { border-color: var(--brand); }

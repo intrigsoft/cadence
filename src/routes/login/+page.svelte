@@ -63,10 +63,10 @@
 
       <div class="divider"><span></span><em>or with email</em><span></span></div>
 
-      <label>Work email</label>
-      <input placeholder="you@northwind.io" disabled />
-      <label>Password</label>
-      <input type="password" placeholder="••••••••" disabled />
+      <label for="email">Work email</label>
+      <input id="email" placeholder="you@northwind.io" disabled />
+      <label for="pw">Password</label>
+      <input id="pw" type="password" placeholder="••••••••" disabled />
       <button class="btn btn-primary signin-btn" disabled>Sign in</button>
 
       <!-- sandbox identity picker -->

@@ -55,6 +55,11 @@
       <form method="POST" action="/logout" class="row-form">
         <button class="row" type="submit"><span class="row-ico"><Icon name="logout" size={17} /></span>Sign out</button>
       </form>
+      <form method="POST" action="/reset" class="row-form">
+        <button class="row" type="submit" title="Restore this device's sandbox to the seed data">
+          <span class="row-ico"><Icon name="timer" size={17} /></span>Reset sandbox
+        </button>
+      </form>
 
       <div class="switch">
         <button class="switch-head" onclick={() => (showSwitch = !showSwitch)}>

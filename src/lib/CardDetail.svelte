@@ -3,7 +3,7 @@
   import Avatar from '$lib/Avatar.svelte';
   import DueChip from '$lib/DueChip.svelte';
   import Popover from '$lib/Popover.svelte';
-  import { dueMeta, shade, shadeText, timeAgo } from '$lib/ui';
+  import { dueMeta, fmtMins, parseDuration, shade, shadeText, timeAgo } from '$lib/ui';
   import { postAction } from '$lib/post';
   import type { Board, Card, Label, User } from '$lib/server/types';
 
@@ -13,6 +13,7 @@
     labels,
     users,
     currentUser,
+    runningTimer = null,
     onClose
   }: {
     card: Card;
@@ -20,6 +21,7 @@
     labels: Record<string, Label>;
     users: Record<string, User>;
     currentUser: User;
+    runningTimer?: { cardId: string; startedAt: number } | null;
     onClose: () => void;
   } = $props();
 
@@ -45,6 +47,32 @@
       ...card.activity.map((a) => ({ ...a, _t: 'activity' as const }))
     ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
   );
+
+  // time tracking
+  const myRoleId = $derived(board.roleAssignments[currentUser.id]);
+  const canTrack = $derived(
+    currentUser.role === 'admin' || (!!myRoleId && (board.workflow.tracking[myRoleId] ?? []).includes(card.listId))
+  );
+  const trackedTotal = $derived(card.timeEntries.reduce((s, e) => s + e.minutes, 0));
+  const timeEntries = $derived(
+    [...card.timeEntries].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
+  );
+  const myRunning = $derived(runningTimer?.cardId === card.id ? runningTimer : null);
+  let nowTick = $state(Date.now());
+  $effect(() => {
+    if (!myRunning) return;
+    const t = setInterval(() => (nowTick = Date.now()), 1000);
+    return () => clearInterval(t);
+  });
+  const liveMins = $derived(myRunning ? Math.max(0, Math.floor((nowTick - myRunning.startedAt) / 60000)) : 0);
+  let logVal = $state('');
+  function submitLog() {
+    const mins = parseDuration(logVal);
+    if (mins && mins > 0) {
+      logVal = '';
+      post('logTime', { cardId: card.id, minutes: String(mins) });
+    }
+  }
 
   let comment = $state('');
   let editingDesc = $state(false);
@@ -199,6 +227,66 @@
             </div>
           </div>
         {/if}
+
+        <!-- time -->
+        <div class="section">
+          <div class="sec-head">
+            <Icon name="timer" size={17} color="var(--ink-3)" />
+            <h3>Time</h3>
+            {#if trackedTotal > 0}<span class="pct mono">{fmtMins(trackedTotal)}</span>{/if}
+          </div>
+          <div class="sec-body">
+            {#if myRunning}
+              <div class="timer-live">
+                <span class="tpulse"></span>
+                <span class="tlabel">Timer running in {list?.name}</span>
+                <span class="tmins mono">{fmtMins(liveMins)}</span>
+                <button class="btn stop" onclick={() => post('stopTimer', {})}><Icon name="stopSq" size={14} /> Stop</button>
+              </div>
+            {:else if canTrack}
+              <div class="timer-controls">
+                <button class="btn btn-primary sm" onclick={() => post('startTimer', { cardId: card.id })}>
+                  <Icon name="play" size={15} /> Start timer
+                </button>
+                <input
+                  class="log-input"
+                  bind:value={logVal}
+                  placeholder="or log: 1h 30m"
+                  onkeydown={(e) => {
+                    if (e.key === 'Enter') submitLog();
+                  }} />
+                <button class="btn btn-outline sm" onclick={submitLog}>Log</button>
+              </div>
+            {:else}
+              <div class="not-trackable">
+                {#if myRoleId}
+                  Time for <b>{board.roles[myRoleId]?.name}</b> isn't tracked in {list?.name}.
+                {:else}
+                  You don't have a role on this board, so time tracking isn't available.
+                {/if}
+              </div>
+            {/if}
+
+            {#if timeEntries.length > 0}
+              <div class="entries">
+                {#each timeEntries as e (e.id)}
+                  {@const u = users[e.userId]}
+                  {@const role = e.roleId ? board.roles[e.roleId] : null}
+                  {@const l = board.lists.find((x) => x.id === e.listId)}
+                  <div class="entry">
+                    <Avatar user={u} size={26} />
+                    <span class="e-name">{u?.name ?? 'Unknown'}</span>
+                    {#if role}
+                      <span class="e-role"><span class="rdot" style="background:{role.color}"></span>{role.name}</span>
+                    {/if}
+                    <span class="e-where">in {l?.name ?? 'a removed stage'}{e.manual ? ' · logged manually' : ''} · {timeAgo(e.at)}</span>
+                    <span class="e-mins mono">{fmtMins(e.minutes)}</span>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        </div>
 
         <!-- activity -->
         <div class="section">
@@ -438,4 +526,24 @@
   .label-full { flex: 1; height: 26px; border-radius: 7px; display: flex; align-items: center; gap: 7px; padding: 0 10px; font-size: 12.5px; font-weight: 700; }
   .date-input { width: 100%; height: 38px; padding: 0 11px; border-radius: 9px; border: 1px solid var(--line-2); font-size: 13.5px; color: var(--ink); outline: none; background: var(--surface); }
   .clear { height: 32px; margin-top: 6px; width: 100%; justify-content: center; }
+
+  .timer-live { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; background: #ddf1ea; border: 1px solid #bce3d6; }
+  .tpulse { width: 8px; height: 8px; border-radius: 99px; background: #0b6b60; animation: beamPulse 1.6s ease-in-out infinite; flex: none; }
+  .tlabel { font-size: 13px; font-weight: 700; color: #0b6b60; flex: 1; }
+  .tmins { font-size: 14px; font-weight: 600; color: #0b6b60; }
+  .stop { height: 30px; background: #0b6b60; color: #fff; font-size: 12.5px; }
+  .timer-controls { display: flex; align-items: center; gap: 8px; }
+  .log-input { width: 130px; height: 34px; padding: 0 11px; border-radius: 9px; border: 1px solid var(--line-2);
+    font-size: 13px; color: var(--ink); outline: none; background: var(--canvas); }
+  .log-input:focus { border-color: var(--brand); }
+  .not-trackable { font-size: 13px; color: var(--ink-3); line-height: 1.5; padding: 9px 12px; border-radius: 10px;
+    background: var(--canvas); border: 1px dashed var(--line-2); }
+  .entries { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+  .entry { display: flex; align-items: center; gap: 10px; }
+  .e-name { font-size: 13px; color: var(--ink); font-weight: 600; }
+  .e-role { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: var(--ink-2);
+    background: rgba(26, 24, 20, 0.05); padding: 1px 7px; border-radius: 99px; }
+  .rdot { width: 6px; height: 6px; border-radius: 99px; }
+  .e-where { font-size: 12px; color: var(--ink-3); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .e-mins { font-size: 12.5px; font-weight: 600; color: var(--ink); }
 </style>

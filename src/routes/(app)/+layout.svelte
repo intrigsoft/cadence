@@ -4,6 +4,7 @@
   import TopBar from '$lib/TopBar.svelte';
   import AssistantPanel from '$lib/AssistantPanel.svelte';
   import NewBoardModal from '$lib/NewBoardModal.svelte';
+  import Toaster from '$lib/Toaster.svelte';
   import type { LayoutData } from './$types';
 
   let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
@@ -37,6 +38,8 @@
   {#if newBoardOpen}
     <NewBoardModal onClose={() => (newBoardOpen = false)} />
   {/if}
+
+  <Toaster />
 </div>
 
 <style>

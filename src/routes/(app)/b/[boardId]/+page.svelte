@@ -7,6 +7,7 @@
   import AvatarStack from '$lib/AvatarStack.svelte';
   import CardTile from '$lib/CardTile.svelte';
   import CardDetail from '$lib/CardDetail.svelte';
+  import TimeReport from '$lib/TimeReport.svelte';
   import { searchQuery } from '$lib/stores';
   import { postAction } from '$lib/post';
   import type { PageData } from './$types';
@@ -51,6 +52,8 @@
     if (idx < 0) return; // this is the source zone; the target zone persists
     await postAction(routeId, 'move', { cardId: id, toListId: columns[i].list.id, toIndex: String(idx) });
   }
+
+  let showReport = $state(false);
 
   // inline composers
   let addingCardFor = $state<string | null>(null);
@@ -98,12 +101,18 @@
         <span class="rdot" style="background:{data.myRole.color}"></span>{data.myRole.name}
       </span>
     {/if}
+    <button class="btn {showReport ? 'btn-primary' : 'btn-outline'} wf" onclick={() => (showReport = !showReport)} title="Board time report">
+      <Icon name="chart" size={16} /> Report
+    </button>
     {#if data.currentUser.role === 'admin'}
       <a class="btn btn-outline wf" href="/b/{data.board.id}/workflow"><Icon name="flow" size={16} /> Workflow</a>
     {/if}
     <AvatarStack users={members} size={30} max={5} />
   </div>
 
+  {#if showReport}
+    <TimeReport board={data.board} cards={data.cards} users={data.users} />
+  {:else}
   <div class="lanes">
     {#each columns as col, i (col.list.id)}
       {@const visible = shown(col.items)}
@@ -190,6 +199,7 @@
       <button class="add-list" onclick={() => (addingList = true)}><Icon name="plus" size={17} /> Add a list</button>
     {/if}
   </div>
+  {/if}
 </div>
 
 {#if openCard}
@@ -199,6 +209,7 @@
     labels={data.labels}
     users={data.users}
     currentUser={data.currentUser}
+    runningTimer={data.runningTimer}
     onClose={() => (openCardId = null)} />
 {/if}
 

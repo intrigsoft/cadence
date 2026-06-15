@@ -319,6 +319,7 @@ export function buildSeed(): WorkspaceState {
     // (the login screen is the product-true entry point).
     currentUserId: 'u_sarah',
     authed: false,
+    timers: {},
     today: TODAY_ISO,
     personaOrder: ['u_sarah', 'u_marcus', 'u_priya', 'u_dana', 'u_tom'],
     createdAt: 0,

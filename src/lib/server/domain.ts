@@ -23,6 +23,7 @@ import type {
   TimeEntry,
   User,
   Visibility,
+  Workflow,
   Workspace,
   WorkspaceState
 } from './types';
@@ -515,6 +516,79 @@ export function timeReport(state: WorkspaceState, actor: Actor | null, boardId: 
     [...m.entries()].map(([key, minutes]) => ({ key, minutes })).sort((a, b) => b.minutes - a.minutes);
   void board;
   return { totalMinutes, byUser: rows(byUser), byRole: rows(byRole), byStage: rows(byStage) };
+}
+
+// ---- timers ----------------------------------------------------------------
+
+export interface RunningTimer {
+  cardId: string;
+  startedAt: number;
+}
+
+export function runningTimer(state: WorkspaceState, actor: Actor | null): RunningTimer | null {
+  const user = actorUser(state, actor);
+  if (!user) return null;
+  return state.timers[user.id] ?? null;
+}
+
+/** Start a timer on a card (auto-stops + logs any other running timer first). */
+export function startTimer(state: WorkspaceState, actor: Actor | null, cardId: string): void {
+  const { user, card, board } = cardCtx(state, actor, cardId);
+  if (!canTrack(board, user, card.listId)) throw new ForbiddenError('Your role cannot track time on this stage');
+  const existing = state.timers[user.id];
+  if (existing && existing.cardId !== cardId) commitTimer(state, user.id);
+  state.timers[user.id] = { cardId, startedAt: Date.now() };
+}
+
+/** Stop the actor's running timer, logging the elapsed minutes as an entry. */
+export function stopTimer(state: WorkspaceState, actor: Actor | null): TimeEntry | null {
+  const user = requireUser(state, actor);
+  return commitTimer(state, user.id);
+}
+
+function commitTimer(state: WorkspaceState, userId: string): TimeEntry | null {
+  const timer = state.timers[userId];
+  if (!timer) return null;
+  delete state.timers[userId];
+  const card = state.cards.find((c) => c.id === timer.cardId);
+  if (!card) return null;
+  const board = state.boards[card.boardId];
+  const minutes = Math.max(1, Math.round((Date.now() - timer.startedAt) / 60000));
+  const entry: TimeEntry = {
+    id: 'te_' + crypto.randomUUID(),
+    userId,
+    roleId: board?.roleAssignments[userId] ?? Object.keys(board?.roles ?? {})[0] ?? '',
+    listId: card.listId,
+    minutes,
+    at: new Date().toISOString(),
+    manual: false
+  };
+  card.timeEntries.push(entry);
+  return entry;
+}
+
+// ---- workflow designer (admin-only) ----------------------------------------
+
+/**
+ * Replace the editable board structure from the Workflow Designer: lists,
+ * roles, role assignments, and the workflow (nodes/edges/permissions/tracking).
+ * Admin-gated — the stage×role permissions this writes are enforced everywhere.
+ */
+export function saveWorkflow(
+  state: WorkspaceState,
+  actor: Actor | null,
+  boardId: string,
+  payload: { lists?: List[]; roles?: Record<string, Role>; roleAssignments?: Record<string, string>; workflow?: Workflow }
+): Board {
+  const user = requireUser(state, actor);
+  const board = state.boards[boardId];
+  if (!board || !board.memberIds.includes(user.id)) throw new NotFoundError();
+  if (user.role !== 'admin') throw new ForbiddenError('Only workspace admins can edit the workflow');
+  if (payload.lists) board.lists = payload.lists;
+  if (payload.roles) board.roles = payload.roles;
+  if (payload.roleAssignments) board.roleAssignments = payload.roleAssignments;
+  if (payload.workflow) board.workflow = payload.workflow;
+  return board;
 }
 
 // ---- sandbox identity (sandbox-only; replaced by real SSO in production) ----

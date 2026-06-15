@@ -8,10 +8,14 @@ import {
   addLabel,
   cardsForBoard,
   getBoard,
+  logTime,
   moveCard,
   patchCard,
   removeChecklistItem,
   removeLabel,
+  runningTimer,
+  startTimer,
+  stopTimer,
   toggleChecklistItem,
   unassignMember
 } from '$lib/server/domain';
@@ -32,7 +36,9 @@ export const load: PageServerLoad = async ({ params, locals }) => {
     cards: cardsForBoard(locals.state, locals.actor, params.boardId),
     labels: locals.state.labels,
     users: locals.state.users,
-    myRole: workflowRole(board, locals.user!.id)
+    myRole: workflowRole(board, locals.user!.id),
+    runningTimer: runningTimer(locals.state, locals.actor),
+    today: locals.state.today
   };
 };
 
@@ -120,5 +126,18 @@ export const actions: Actions = {
       if (card?.labels.includes(labelId)) removeLabel(locals.state, locals.actor, cardId, labelId);
       else addLabel(locals.state, locals.actor, cardId, labelId);
     });
+  },
+  logTime: async ({ request, locals }) => {
+    const f = await request.formData();
+    return guard(() =>
+      logTime(locals.state, locals.actor, String(f.get('cardId')), { minutes: Number(f.get('minutes') ?? 0), manual: true })
+    );
+  },
+  startTimer: async ({ request, locals }) => {
+    const f = await request.formData();
+    return guard(() => startTimer(locals.state, locals.actor, String(f.get('cardId'))));
+  },
+  stopTimer: async ({ locals }) => {
+    return guard(() => stopTimer(locals.state, locals.actor));
   }
 };
