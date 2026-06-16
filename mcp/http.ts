@@ -10,7 +10,9 @@ import { createServer, type IncomingMessage } from 'node:http';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createCadenceMcpServer } from './server.js';
 
-const PORT = Number(process.env.CADENCE_MCP_PORT ?? 5174);
+// Prefer the platform-injected PORT (Railway/Heroku set this) so the public
+// proxy can reach us; fall back to CADENCE_MCP_PORT, then the dev default.
+const PORT = Number(process.env.PORT ?? process.env.CADENCE_MCP_PORT ?? 5174);
 
 async function readBody(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];

@@ -1,0 +1,14 @@
+# Cadence MCP relay — HTTP transport (`tsx mcp/http.ts`, POST /mcp).
+# DioscHub registers this as an MCP instance (serverUrl https://<host>/mcp).
+# Stateless + credential-blind: per-call BYOA artifact arrives in _meta.headers.
+FROM node:22-slim
+WORKDIR /app
+ENV NODE_ENV=production
+# tsx and the MCP SDK are runtime dependencies, so a prod-only install is enough.
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+COPY . .
+# mcp/http.ts prefers the platform PORT; this default is for local runs.
+ENV CADENCE_MCP_PORT=5174
+EXPOSE 5174
+CMD ["npm", "run", "mcp:http"]

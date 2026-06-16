@@ -45,33 +45,67 @@
     tick();
   }
 
+  // boardId -> name, populated by loadBoards(); used to label card mentions.
+  let boardNames = new Map<string, string>();
+  // Cache card-search results per query so repeats/backspace don't refetch.
+  const cardSearchCache = new Map<string, Mentionable[]>();
+
   /**
-   * Build a `@`-mention list of *the current user's* boards and assigned cards.
-   * The kit's provider is synchronous, so we pre-fetch (cookie-scoped — "related
-   * to me") and filter in memory.
+   * The signed-in user's boards — a small set, so we pre-fetch once and filter
+   * in memory for `@board` mentions.
    */
-  async function loadMentionItems(): Promise<Mentionable[]> {
+  async function loadBoards(): Promise<Mentionable[]> {
     try {
-      const [boardsRes, cardsRes] = await Promise.all([
-        fetch('/api/v1/boards', { credentials: 'include' }),
-        fetch('/api/v1/cards/mine', { credentials: 'include' }),
-      ]);
-      const boards = (await boardsRes.json())?.data ?? [];
-      const cards = (await cardsRes.json())?.data ?? [];
-      const boardName = new Map<string, string>(boards.map((b: any) => [b.id, b.name]));
-      return [
-        ...boards.map((b: any) => ({ id: b.id, name: b.name, kind: 'board', group: 'Boards' })),
-        ...cards.map((c: any) => ({
-          id: c.id,
-          name: c.title,
-          kind: 'card',
-          description: boardName.get(c.boardId),
-          group: 'My cards',
-        })),
-      ];
+      const res = await fetch('/api/v1/boards', { credentials: 'include' });
+      const boards = (await res.json())?.data ?? [];
+      boardNames = new Map<string, string>(boards.map((b: any) => [b.id, b.name]));
+      return boards.map((b: any) => ({ id: b.id, name: b.name, kind: 'board', group: 'Boards' }));
     } catch {
-      return []; // mentions are a nicety — fail quietly
+      return [];
     }
+  }
+
+  /**
+   * Async `@card` search against the backend (searches ALL accessible cards,
+   * not just assigned ones), cached per query.
+   */
+  async function searchCards(needle: string): Promise<Mentionable[]> {
+    const q = needle.trim();
+    if (!q) return [];
+    const cached = cardSearchCache.get(q);
+    if (cached) return cached;
+    try {
+      const res = await fetch('/api/v1/cards/search?q=' + encodeURIComponent(q), { credentials: 'include' });
+      const cards = (await res.json())?.data ?? [];
+      const items: Mentionable[] = cards.slice(0, 15).map((c: any) => ({
+        id: c.id,
+        name: c.title,
+        kind: 'card',
+        description: boardNames.get(c.boardId),
+        group: 'Cards',
+      }));
+      cardSearchCache.set(q, items);
+      return items;
+    } catch {
+      return [];
+    }
+  }
+
+  // Trailing debounce so we don't hit the backend on every keystroke. A
+  // superseded call resolves to [] (the kit drops it via its race guard anyway).
+  let searchTimer: ReturnType<typeof setTimeout> | undefined;
+  let supersede: ((v: Mentionable[]) => void) | null = null;
+  function debouncedSearchCards(needle: string): Promise<Mentionable[]> {
+    return new Promise((resolve) => {
+      if (supersede) supersede([]);
+      supersede = resolve;
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(async () => {
+        const r = await searchCards(needle);
+        resolve(r);
+        supersede = null;
+      }, 180);
+    });
   }
 
   onMount(() => {
@@ -88,14 +122,16 @@
     let cancelled = false;
     const cleanups: Array<() => void> = [];
 
-    // Mention provider — boards + cards related to the signed-in user.
-    void loadMentionItems().then((items) => {
-      if (cancelled || items.length === 0) return;
+    // Mention provider — @boards (pre-fetched, in-memory) + @cards (async
+    // backend search across all accessible cards). The kit now supports an
+    // async provider: it shows a loading row and drops stale results.
+    void loadBoards().then((boards) => {
+      if (cancelled) return;
       whenDioscReady(() => cancelled, (diosc) => {
-        diosc('mentionProvider', (needle: string): Mentionable[] => {
+        diosc('mentionProvider', (needle: string): Promise<Mentionable[]> => {
           const q = needle.trim().toLowerCase();
-          const matches = q ? items.filter((i) => i.name.toLowerCase().includes(q)) : items;
-          return matches.slice(0, 20);
+          const boardMatches = (q ? boards.filter((b) => b.name.toLowerCase().includes(q)) : boards).slice(0, 6);
+          return debouncedSearchCards(needle).then((cards) => [...boardMatches, ...cards]);
         });
         cleanups.push(() => {
           try { (window as any).diosc?.('mentionProvider', null); } catch { /* noop */ }
