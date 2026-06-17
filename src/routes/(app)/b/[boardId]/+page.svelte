@@ -76,8 +76,16 @@
   }
 
   // card modal — read fresh from data so it updates after mutations.
-  // Honors a ?card=ID deep-link (e.g. from My Cards) on first render.
+  // Honors a ?card=ID deep-link (e.g. from My Cards, or the assistant opening a
+  // card) on first render.
   let openCardId = $state<string | null>(get(page).url.searchParams.get('card'));
+  // Follow the ?card param when it changes via client-side navigation. The
+  // assistant's `navigate` tool routes through SvelteKit's router (no reload),
+  // so a goto to this same board with a different ?card must reopen the modal —
+  // the one-time initializer above only fires on a fresh mount.
+  $effect(() => {
+    openCardId = $page.url.searchParams.get('card');
+  });
   const openCard = $derived(openCardId ? (data.cards.find((c) => c.id === openCardId) ?? null) : null);
 </script>
 

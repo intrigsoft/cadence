@@ -4,7 +4,7 @@
   // loader defines the element + boots the engine; because this element already
   // exists in the DOM, the loader skips its own FAB injection.
   import { onMount } from 'svelte';
-  import { invalidateAll } from '$app/navigation';
+  import { goto, invalidateAll } from '$app/navigation';
   import { assistantOpen } from '$lib/stores';
   import { env } from '$env/dynamic/public';
 
@@ -136,6 +136,31 @@
         cleanups.push(() => {
           try { (window as any).diosc?.('mentionProvider', null); } catch { /* noop */ }
         });
+      });
+    });
+
+    // SPA navigation — the assistant's `navigate` tool interrupts the graph and
+    // the kit dispatches it to whatever handler is registered for 'navigate'.
+    // By default the kit falls back to window.location.assign (a full reload);
+    // overriding the handler here routes it through SvelteKit's router instead,
+    // so the page (and the embedded chat) transition without a reload. The hub
+    // only emits paths it validated against the assistant's sitemap.
+    whenDioscReady(() => cancelled, (diosc) => {
+      diosc('tool', 'navigate', async (data: any) => {
+        const path = data?.params?.path ?? data?.path ?? data?.url;
+        if (typeof path !== 'string' || !path) {
+          return { error: 'No path provided for navigation' };
+        }
+        try {
+          await goto(path);
+          return { navigatedTo: path };
+        } catch (err) {
+          return { error: err instanceof Error ? err.message : 'Navigation failed' };
+        }
+      });
+      cleanups.push(() => {
+        // Restore the kit's default by clearing our override on teardown.
+        try { (window as any).diosc?.('tool', 'navigate', null); } catch { /* noop */ }
       });
     });
 
