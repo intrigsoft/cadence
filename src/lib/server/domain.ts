@@ -603,6 +603,126 @@ export function saveWorkflow(
   return board;
 }
 
+// ---- granular workflow editing (admin-only) --------------------------------
+//
+// Targeted edits that mutate ONE thing — a stage's name, a single role's
+// permission on one stage, etc. Unlike saveWorkflow (whole-graph replace),
+// these can't drop an entry the caller didn't touch, so an LLM rebuilding a
+// full payload can't silently corrupt unrelated permissions.
+
+/** Shared gate for every workflow edit: visible board + workspace-admin. */
+function requireWorkflowAdmin(state: WorkspaceState, actor: Actor | null, boardId: string): Board {
+  const user = requireUser(state, actor);
+  const board = state.boards[boardId];
+  if (!board || !board.memberIds.includes(user.id)) throw new NotFoundError();
+  if (user.role !== 'admin') throw new ForbiddenError('Only workspace admins can edit the workflow', 'ADMIN_REQUIRED');
+  return board;
+}
+
+function requireStage(board: Board, listId: string): List {
+  const list = board.lists.find((l) => l.id === listId);
+  if (!list) throw new NotFoundError('Stage not found');
+  return list;
+}
+
+/** Rename a single stage. */
+export function renameStage(state: WorkspaceState, actor: Actor | null, boardId: string, listId: string, name: string): Board {
+  const board = requireWorkflowAdmin(state, actor, boardId);
+  const list = requireStage(board, listId);
+  const n = name.trim();
+  if (!n) throw new ValidationError('Stage name is required');
+  list.name = n;
+  return board;
+}
+
+/** Remove a stage. Refuses while cards remain in it (move them out first). */
+export function removeStage(state: WorkspaceState, actor: Actor | null, boardId: string, listId: string): Board {
+  const board = requireWorkflowAdmin(state, actor, boardId);
+  requireStage(board, listId);
+  if (state.cards.some((c) => c.boardId === boardId && c.listId === listId)) {
+    throw new ValidationError('Move the cards out of this stage before removing it');
+  }
+  board.lists = board.lists.filter((l) => l.id !== listId);
+  delete board.workflow.nodes[listId];
+  delete board.workflow.permissions[listId];
+  for (const rid of Object.keys(board.workflow.tracking)) {
+    board.workflow.tracking[rid] = board.workflow.tracking[rid].filter((x) => x !== listId);
+  }
+  board.workflow.edges = board.workflow.edges.filter((e) => e.from !== listId && e.to !== listId);
+  return board;
+}
+
+/** Move a stage to a new index in the board's ordered list of stages. */
+export function reorderStage(state: WorkspaceState, actor: Actor | null, boardId: string, listId: string, toIndex: number): Board {
+  const board = requireWorkflowAdmin(state, actor, boardId);
+  const from = board.lists.findIndex((l) => l.id === listId);
+  if (from < 0) throw new NotFoundError('Stage not found');
+  const idx = Math.max(0, Math.min(Math.trunc(toIndex), board.lists.length - 1));
+  const [moved] = board.lists.splice(from, 1);
+  board.lists.splice(idx, 0, moved);
+  return board;
+}
+
+/** Set one role's pick/drop/work on one stage. Omitted verbs are left as-is. */
+export function setStagePermission(
+  state: WorkspaceState,
+  actor: Actor | null,
+  boardId: string,
+  listId: string,
+  roleId: string,
+  perm: { pick?: boolean; drop?: boolean; work?: boolean }
+): Board {
+  const board = requireWorkflowAdmin(state, actor, boardId);
+  requireStage(board, listId);
+  if (!board.roles[roleId]) throw new ValidationError('Unknown role for this board');
+  const stage = board.workflow.permissions[listId] ?? (board.workflow.permissions[listId] = {});
+  const cur = stage[roleId] ?? { pick: false, drop: false, work: false };
+  stage[roleId] = {
+    pick: perm.pick ?? cur.pick,
+    drop: perm.drop ?? cur.drop,
+    work: perm.work ?? cur.work
+  };
+  return board;
+}
+
+/** Enable/disable time tracking for one role on one stage. */
+export function setStageTracking(
+  state: WorkspaceState,
+  actor: Actor | null,
+  boardId: string,
+  listId: string,
+  roleId: string,
+  enabled: boolean
+): Board {
+  const board = requireWorkflowAdmin(state, actor, boardId);
+  requireStage(board, listId);
+  if (!board.roles[roleId]) throw new ValidationError('Unknown role for this board');
+  const cur = board.workflow.tracking[roleId] ?? [];
+  const has = cur.includes(listId);
+  if (enabled && !has) board.workflow.tracking[roleId] = [...cur, listId];
+  else if (!enabled && has) board.workflow.tracking[roleId] = cur.filter((x) => x !== listId);
+  return board;
+}
+
+/** Assign (or clear, with roleId=null) a member's project role on a board. */
+export function assignBoardRole(
+  state: WorkspaceState,
+  actor: Actor | null,
+  boardId: string,
+  userId: string,
+  roleId: string | null
+): Board {
+  const board = requireWorkflowAdmin(state, actor, boardId);
+  if (!board.memberIds.includes(userId)) throw new ValidationError('User is not a member of this board');
+  if (roleId) {
+    if (!board.roles[roleId]) throw new ValidationError('Unknown role for this board');
+    board.roleAssignments[userId] = roleId;
+  } else {
+    delete board.roleAssignments[userId];
+  }
+  return board;
+}
+
 // ---- sandbox identity (sandbox-only; replaced by real SSO in production) ----
 
 /** Switch the device's signed-in identity (login picker / "switch demo identity"). */
